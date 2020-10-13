@@ -1,0 +1,879 @@
+---
+title: "Linear Regression with R"
+tutorial:
+  id: "f6487f97-7138-46a7-a0ec-91d523953a2e"
+  version: 1.0
+output: learnr::tutorial
+runtime: shiny_prerendered
+author: Aymeric Stamm
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(testwhat)
+library(magrittr)
+library(ggplot2)
+
+options(repos = "https://cloud.r-project.org")
+tutorial_options(
+  exercise.timelimit = 60,
+  exercise.checker = testwhat::testwhat_learnr
+)
+knitr::opts_chunk$set(comment = NA)
+
+production <- teachr::production
+brain <- teachr::brain
+anscombe <- teachr::anscombe
+cement <- teachr::cement
+job <- teachr::job
+cars <- teachr::cars
+mussels <- teachr::mussels
+```
+
+## Theory
+
+### Setup
+
+The goal is to propose and estimate a model for explaining a *response variable* $Y_i$ from a number of fixed *predictors* $x_{i1}, \dots, x_{ik}$.
+
+Mathematically, the model reads:
+
+$$ Y_i = \beta_0 + \beta_1 x_{i1} + \dots + \beta_k x_{ik} + \varepsilon_i, \quad \mbox{with} \quad \mathbb{E}[\varepsilon_i] = 0 \quad \mbox{and} \quad \mathbb{V}\mbox{ar}[\varepsilon_i] = \sigma^2. $$
+
+We can summarize the assumptions on which relies the linear regression model as follows:
+
+1. The predictors are fixed. This means that we do not assume (or take into account the) intrinsic variability in the predictor values. The randomness of $Y_i$ all comes from the error term $\varepsilon_i$. In particular, it implies that considering a sample of $n$ *i.i.d.* random response variables $Y_1, \dots, Y_n$ boils down to assuming that $\varepsilon_1, \dots, \varepsilon_n$ are *i.i.d.*;
+2. The error random variables $\varepsilon_i$ are centered and of constant variance. Combined with Assumption 1, this means that $\mathbb{E}[\boldsymbol{\varepsilon}] = \mathbf{0}$ and $\mathrm{Cov}[\boldsymbol{\varepsilon}] = \sigma^2 \mathbb{I}_n$;
+3. [*optional*] Parametric hypothesis testing and confidence intervals further require the assumption of normality for the error vector, *i.e.* $\boldsymbol{\varepsilon} \sim \mathcal{N}(\mathbf{0}, \sigma^2 \mathbb{I}_n)$.
+
+Let $Y_1, \dots, Y_n$ be a sample of $n$ *i.i.d.* random response variables with associated observed values $y_1, \dots, y_n$. We define the so-called *design matrix* $\mathbb{X}$ of size $n \times (k + 1)$ with $x_{ij}$ at row $i$ and column $j$. This allows us to put the model into matrix form:
+
+$$ \mathbf{y} = \mathbb{X} \boldsymbol{\beta} + \boldsymbol{\varepsilon}. $$
+
+**Warning:** The model is called *linear* regression not because we necessarily look for a linear relationship between $Y$ and each $X_i$ but because it is linear in the $\boldsymbol{\beta}$ *coefficients*.
+
+### Estimation
+
+Estimating the model consequently boils down to estimating 
+
+- the regression coefficients $\boldsymbol{\beta}$; and,
+- the common error variance term $\sigma^2$.
+
+This is usually done be minimizing the sum of squared differences between the observed and predicted responses:
+
+$$ \mbox{SSD}(\boldsymbol{\beta}, \sigma^2; \mathbf{y}, \mathbb{X}) := (\mathbf{y} - \mathbb{X} \boldsymbol{\beta})^\top (\mathbf{y} - \mathbb{X} \boldsymbol{\beta}) = \sum_{i = 1}^n (y_i - (\beta_0 + \beta_1 x_{i1} + \dots + \beta_k x_{ik}))^2 .$$
+
+This leads to the following **coefficient estimator**:
+
+$$ \widehat{\boldsymbol{\beta}} := (\mathbb{X}^T \mathbb{X})^{-1} \mathbb{X}^\top \mathbf{Y}, $$
+
+from which we can define the **fitted response**:
+
+$$ \widehat{\mathbf{Y}} = \mathbb{X} \widehat{\boldsymbol{\beta}} = \mathbb{X} (\mathbb{X}^T \mathbb{X})^{-1} \mathbb{X}^\top \mathbf{Y} = \mathbb{H} \mathbf{Y}. $$
+
+The matrix $\mathbb{H}$ is often called the *hat matrix* or *projection matrix* or *influence matrix*. The diagonal terms are such that $0 \le h_{ii} \le 1$. They are called the **leverage score** of each observation $(y_i, x_{i1}, \dots, x_{ik}$. Note that the leverage does not depend on $y_i$ at all but only on the predictor values. Also, with some abuse of notation, we can write:
+
+$$ h_{ii} = \frac{\partial \widehat{Y_i}}{\partial Y_i}, $$
+
+which illustrates the leverage measures the degree by which the $i$-*th* measured value influences the $i$-*th* fitted value.
+
+An unbiased estimator of the constant variance term $\sigma^2$ is given by:
+
+$$ \widehat{\sigma^2} := \frac{(\mathbf{Y} - \widehat{\mathbf{Y}})^\top (\mathbf{Y} - \widehat{\mathbf{Y}})}{n - k - 1}. $$
+
+### Residuals
+
+We can define the **residuals** of a fitted linear regression model as the difference between the observed and fitted response values:
+
+$$ \widehat{\boldsymbol{\varepsilon}} := \mathbf{y} - \widehat{\mathbf{y}} = (\mathbb{I}_n - \mathbb{H}) \mathbf{y}. $$
+
+As a result, we still do have $\mathbb{E}[\widehat{\boldsymbol{\varepsilon}}] = \mathbf{0}$ but we no longer have residuals with constant variance because $\mathbb{V}\mbox{ar}[\widehat{\varepsilon}_i] = \sigma^2 (1 - h_{ii})$ and residuals are not uncorrelated anymore since $\mbox{Cov}(\widehat{\varepsilon}_i, \widehat{\varepsilon}_j) = -h_{ij}$, for $i \ne j$.
+
+**Standardized residuals** are a way of estimating the error for a particular data point which takes into account the leverage/influence of the point. These are sometimes called *internally studentized residuals*
+
+$$ r_i := \frac{\widehat{\varepsilon}_i}{s(\widehat{\varepsilon}_i)} = \frac{\widehat{\varepsilon}_i}{\sqrt{\widehat{\sigma^2} \left( 1 - h_{ii} \right)}}. $$
+
+The motivation behind standardized residuals is that even though our model assumed homoscedasticity with an *i.i.d.* error term with fixed variance $\varepsilon \sim \mathcal{N}(0, \sigma^2)$, the distribution of the residuals $\widehat{\varepsilon}_i$ cannot be i.i.d. because the sum of residuals is always *exactly* zero. In fact, $\mbox{Cov}(\widehat{\boldsymbol{\varepsilon}}) = I - H$.
+
+**Studentized residuals** for any given data point are calculated from a model fit to every other data point except the one in question. This is variously called the *externally studentized residuals*, *deleted residuals* or *jackknifed residuals*.
+
+This sounds computationally difficult (it sounds like we would have to fit one new model for every point) but in fact there's a way to compute it from just the original model without refitting using the standardized residuals $r_i$:
+
+$$ t_i := r_i \left( \frac{n - k - 2}{n - k - 1 - r_i^2} \right)^{1/2}, $$
+
+where $n$ is the total number of observations and $k$ is the number of predictors used in the model.
+
+The motivation behind studentized residuals comes from their use in outlier testing. If we suspect a point is an outlier, then it was not generated from the assumed model, by definition. Therefore it would be a mistake - a violation of assumptions - to include that outlier in the fitting of the model. Studentized residuals are widely used in practical outlier detection.
+
+Studentized residuals also have the desirable property that for each data point, the residual follows a Student's t-distribution, if the normality assumption of the original regression model is met.
+
+**Source:** (https://stats.stackexchange.com/questions/204708/is-studentized-residuals-v-s-standardized-residuals-in-lm-model)
+
+### Cook's distance
+
+Cook's distance $D_i$ of observation $i$ (for $i = 1, \dots, n$) is defined as a normalized version of the sum of squared differences between the fitted values obtained by including or excluding that observation:
+
+$$ D_i := \frac{ \sum_{j = 1}^{n} \left( \widehat{y}_j - \widehat{y}_j^{(-i)} \right)^2}{\widehat{\sigma^2} (k+1)}, $$
+where $\widehat{y}_j^{(-i)}$ is the fitted response value obtained when excluding observation $i$. Interestingly, it can be expressed in terms the leverage scores and the standardized residuals in a quite simple form:
+
+$$ D_i = \frac{r_i^2}{k+1} \frac{h_{ii}}{1-h_{ii}}. $$
+
+This last equation shows that there are two phenomena that affect the value of $D_i$:
+
+- If observation $i$ is an **outlier**, in the sense that it has probably been drawn from another distribution with respect to the other observations, then $r_i$ should be excessively high, which tends to increase Cook's distance;
+- If observation $i$ has a lot of **influence**, in the sense that its leverage score is high, then Cook's distance increases.
+
+**Notes:** 
+
+1. You can have cases in which an observation might have high influence but is not necessarily an outlier and therefore should be kept for analysis.
+2. The reverse can happen as well. Some points with low influence (low leverage score) can be outliers (high residual value). In this case, we could be tempted to remove the observation because it violates our assumption.
+
+Cook's distance does not help in the above two situations, but it does not really matter, because, in both cases, we can safely include the corresponding observation into our regression.
+
+### Confidence and prediction intervals
+
+**Confidence interval for the mean response $\mathbf{x}_i^\top \boldsymbol{\beta}$ at an already observed point $\mathbf{x}_i$, $i=1,\dots,n$.**
+
+We are in the following setting:
+
+- We aim at estimating the mean response at $\mathbf{x}_i$ which is:
+
+$$ \mathbf{x}_i^\top \boldsymbol{\beta}. $$
+
+- We use the coefficient estimator which leads to the following estimator for the mean response:
+
+$$ \mathbf{x}_i^\top \widehat{\boldsymbol{\beta}} \sim \mathcal{N} \left( \mathbf{x}_i^\top \boldsymbol{\beta}, \sigma^2 \mathbf{x}_i^\top (\mathbb{X}^\top \mathbb{X})^{-1} \mathbf{x}_i \right), $$
+
+We also have that:
+
+$$ \frac{\widehat{\sigma^2}}{\sigma^2} \sim \chi^2(n-k-1), $$
+
+and $\widehat{\boldsymbol{\beta}}$ and $\widehat{\sigma^2}$ are statistically independent. Thus, we can write:
+
+$$ \frac{\mathbf{x}_i^\top \boldsymbol{\beta} - \mathbf{x}_i^\top \widehat{\boldsymbol{\beta}}}{\sqrt{\widehat{\sigma^2} \mathbf{x}_i^\top (\mathbb{X}^\top \mathbb{X})^{-1} \mathbf{x}_i}} \sim \mathcal{T}(n-k-1). $$
+
+We can therefore express a $(1-\alpha)\%$ *confidence* interval for the mean response $\mathbf{x}_i^\top \boldsymbol{\beta}$ at $\mathbf{x}_i$ as:
+
+$$ \mathbb{P} \left( \mathbf{x}_i^\top \boldsymbol{\beta} \in \left[ \mathbf{x}_i^\top \widehat{\boldsymbol{\beta}} \pm t_{1-\frac{\alpha}{2}}(n-k-1) \sqrt{\widehat{\sigma^2} \mathbf{x}_i^\top (\mathbb{X}^\top \mathbb{X})^{-1} \mathbf{x}_i} \right] \right) = 1 - \alpha. $$
+
+**Prediction interval for a new not yet observed response $Y_{n+1}$ at a new observed point $\mathbf{x}_{n+1}$.**
+
+We are in the following setting:
+
+- We aim at estimating:
+
+$$ Y_{n+1} = \mathbf{x}_{n+1}^\top \boldsymbol{\beta} + \varepsilon_{n+1} \sim \mathcal{N} \left( \mathbf{x}_{n+1}^\top \boldsymbol{\beta}, \sigma^2 \right), $$
+
+- We use the coefficient estimator which leads to the following estimator for a new response:
+
+$$ \widehat{Y_{n+1}} = \mathbf{x}_{n+1}^\top \widehat{\boldsymbol{\beta}} \sim \mathcal{N}  \left( \mathbf{x}_{n+1}^\top \boldsymbol{\beta}, \sigma^2 \mathbf{x}_{n+1}^\top (\mathbb{X}^\top \mathbb{X})^{-1} \mathbf{x}_{n+1} \right), $$
+
+which implies:
+
+$$ Y_{n+1} - \widehat{Y_{n+1}} \sim \mathcal{N} \left( 0, \sigma^2 \left( 1 + \mathbf{x}_{n+1}^\top (\mathbb{X}^\top \mathbb{X})^{-1} \mathbf{x}_{n+1} \right) \right). $$
+
+Thus, we have:
+
+$$ \frac{Y_{n+1} - \widehat{Y_{n+1}}}{\sqrt{\widehat{\sigma^2} \left( 1 + \mathbf{x}_{n+1}^\top (\mathbb{X}^\top \mathbb{X})^{-1} \mathbf{x}_{n+1} \right)}} \sim \mathcal{T}(n-k-1). $$
+
+We can therefore express a $(1-\alpha)\%$ *prediction* interval for the new not yet observed response $Y_{n+1}$ at $\mathbf{x}_{n+1}$ as:
+
+$$ \mathbb{P} \left( Y_{n+1} \in \left[ \widehat{Y_{n+1}} \pm t_{1-\frac{\alpha}{2}}(n-k-1) \sqrt{\widehat{\sigma^2} \left( 1 + \mathbf{x}_{n+1}^\top (\mathbb{X}^\top \mathbb{X})^{-1} \mathbf{x}_{n+1} \right)} \right] \right) = 1 - \alpha. $$
+
+## Simple models
+
+### First step: Visualization
+
+Let us generate two data sets: one for which things will go well and one for which things will go sideways. The following code produces the desired data sets and put them together into a tidy tibble:
+
+```{r nl-data-gen}
+set.seed(1234)
+
+n <- 1000      # sample size
+x <- seq(0, 100, length.out = n)
+first_data <- 3 + 0.1 * x + rnorm(n, sd = 3)
+second_data <- 3 + 0.1 * x + 10 * sin(x / 3) + rnorm(n, sd = 3)
+
+full_data <- tibble::tibble(x, first_data, second_data) %>%
+  tidyr::pivot_longer(cols = -x, values_to = "y")
+```
+
+**The most important and first thing you should do before any attempt to modeling is to take a look at your data.**
+
+```{r nl-data-viz, fig.align='center'}
+full_data %>%
+  ggplot(aes(x, y, col = name)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_grid(cols = vars(name)) + 
+  labs(
+    title = "Scatterplots of y against x.",
+    subtitle = "By dataset."
+  ) + 
+  theme_bw() + 
+  theme(legend.position = "none") + 
+  scale_color_viridis_d(option = "cividis")
+```
+
+As you can see, both data sets seem to generate the same linear regression predictions, although we already clearly understand which one will go sideways...
+
+### Second step: Modeling
+
+Let us go deeper now. If one really want to fit a linear regression model to explain `y` in terms of `x` in both situations, you can use the function `stats::lm()` that does all the computations for you. 
+
+The main (first) argument is a formula of the form `y ~ x`:
+
+- the left-hand side of the formula should be the name of the variable or R object that stores the observed responses,
+- the right-hand side is a combination of predictors.
+
+Using `lm()` with just the formula works if the response and the predictors are stored as atomic vectors in your current R session. Alternatively, an optional `data` argument can be supplied to `lm()`, in which case R is instructed to look for the observed response and predictors in the supplied data set.
+
+Going back to our first toy example, the observed response and predictor values are stored in atomic vectors `first_data` and `x` respectively. Hence, we can ask R to fit the model for us using:
+
+```{r first-data-lm}
+first_model <- lm(first_data ~ x)
+```
+
+To retrieve all the relevant quantities out of the output object returned by `lm()`, there are three dedicated functions in the [**broom**](https://broom.tidyverse.org) package.
+
+[**broom::glance()**](https://broom.tidyverse.org/reference/glance.lm.html)
+
+```{r first-data-lm-glance}
+broom::glance(first_model)
+```
+
+This function retrieves some classic *global measures* of the regression fit:
+
+- **r.squared** and **adj.r.squared**. The coefficient of determination $R^2$ and its adjusted version $R_\mathrm{adj}^2$ aim at estimating the proportion of variance of the response variable $\mathbf{Y}$ explained by the fitted model $\widehat{\mathbf{Y}}$. Mathematically, they aim at estimating 
+
+$$ \frac{\sigma_\widehat{\mathbf{Y}}^2}{\sigma_\mathbf{Y}^2} = 1 - \frac{\sigma_\widehat{\boldsymbol{\varepsilon}}^2}{\sigma_\mathbf{Y}^2}. $$ 
+
+Their definition is based on the following variance decomposition identity:
+
+$$ \mathrm{SS}_\mathrm{tot} = \sum_{i=1}^n (Y_i - \overline Y)^2 = \sum_{i=1}^n (Y_i - \widehat{Y}_i)^2 + \sum_{i=1}^n (\widehat{Y}_i - \overline Y)^2 = \mathrm{SS}_\mathrm{res} + \mathrm{SS}_\mathrm{reg}, $$
+which holds when an intercept is included in the regression model.
+
+From here, $R^2$ is defined as:
+
+$$ R^2 := 1 - \frac{\frac{\mathrm{SS}_\mathrm{res}}{n}}{\frac{\mathrm{SS}_\mathrm{tot}}{n}} = 1 - \frac{\mathrm{SS}_\mathrm{res}}{\mathrm{SS}_\mathrm{tot}}, $$
+
+using therefore
+
+$$ \widehat{\sigma_\mathbf{Y}^2} = \frac{\mathrm{SS}_\mathrm{reg}}{n} \quad \mbox{and} \quad \widehat{\sigma_\widehat{\mathbf{Y}}^2} = \frac{\mathrm{SS}_\mathrm{reg}}{n} $$
+
+as (biased) estimators of the corresponding variances. $R^2$ is bounded in $[0, 1]$ but monotonically increases with the number of predictors.
+
+The adjusted $R^2$ is an attempt to account for possible overfitting. It is defined by replacing the biased variance estimators with unbiased versions:
+
+$$ R_\mathrm{adj}^2 := 1 - \frac{\frac{\mathrm{SS}_\mathrm{res}}{n - k - 1}}{\frac{\mathrm{SS}_\mathrm{tot}}{n - 1}} = 1 - (1 - R^2) \frac{n - 1}{n - k - 1}. $$
+
+Note that $R_\mathrm{adj}^2$ can sometimes become negative but is always smaller or equal to $R^2$. In fact, even the original $R^2$ coefficient can become negative or exceed $1$ when no intercept is included in the model because the above variance decomposition identity does not hold anymore. When negative values occur, it means that the mean of the observed response values provides a better fit than the fitted values in terms of explaining the response variable.
+
+- **sigma**. This is the estimate or the error variance (which is also the response variable variance) provided by the following estimator:
+
+$$ \widehat{\sigma^2} = \frac{\widehat{\boldsymbol{\varepsilon}}^\top \widehat{\boldsymbol{\varepsilon}}}{n - k - 1}. $$
+
+- **statistic** and **p.value**. It is possible to formulate a global hypothesis test to assess whether the fitted regression model has been estimated with sufficient precision so as to be statistically non-zero. We indeed aim at rejecting the null hypothesis 
+$$ H_0: \beta_1 = \dots = \beta_k = 0 $$
+in favor of the alternative 
+
+$$ H_1: \exists j \in \{1, \dots, k \}: \beta_j \ne 0 $$
+
+because, otherwise, it would mean that the response is in fact statistically explained only by the residuals. The `statistic` parameter represents the value of a suited test statistic computed from the observed values. This test statistic is defined as:
+
+$$ F_\mathrm{reg} = \frac{\frac{\mathrm{SS}_\mathrm{reg}}{k}}{\frac{\mathrm{SS}_\mathrm{res}}{n - k - 1}}. $$
+
+The `p.value` parameter reports the $p$-value of the corresponding test, calculated under the assumption of normality of the residuals, in which case the test statistic follows a central Fisher distribution under the null hypothesis: $F \stackrel{H_0}{\sim} \mathcal{F}isher(k, n - k - 1)$.
+
+- **df**. This is the degrees of freedom used to estimate the regression coefficients, which amounts to:
+
+$$ \mathrm{df}_\mathrm{reg} = k + 1. $$
+
+- **logLik**. This is the logarithm of the likelihood function evaluated at the estimated parameters $(\widehat{\boldsymbol{\beta}}, \widehat{\sigma^2})$.
+- **AIC**. This is the Akaike's information criterion defined as:
+
+$$ \mathrm{AIC} = -2\ \mathrm{logLik} + 2 (k + 2), $$
+where $k + 2$ is the number of estimated parameters, including the intercept coefficient, the coefficients of the $k$ predictors and the error variance estimate. 
+
+- **BIC**. This is the Bayesian information criterion defined as:
+
+$$ \mathrm{BIC} = -2\ \mathrm{logLik} + (k + 2) \log n. $$
+
+- **deviance**. In the context of linear models, the deviance is nothing but the residual sum of squares:
+
+$$ D = \widehat{\boldsymbol{\varepsilon}}^\top \widehat{\boldsymbol{\varepsilon}} = (n - k - 1) \widehat{\sigma^2}. $$
+
+- **df.residual**. This is the degrees of freedom left to estimate the error variance, which amounts to:
+
+$$ \mathrm{df}_\mathrm{res} = n - k - 1. $$
+
+[**broom::tidy()**](https://broom.tidyverse.org/reference/tidy.lm.html)
+
+```{r first-data-lm-tidy}
+broom::tidy(first_model)
+```
+
+This function retrieves information about the estimated coefficients and the distribution of the corresponding estimators:
+
+- `term`. This gives the name of the predictor to which the coefficient is associated.
+- `estimate` and `std.error`. The `estimate` of each coefficients is produced by the estimator
+
+$$ \widehat{\boldsymbol{\beta}} = (\mathbb{X}^\top \mathbb{X})^{-1} \mathbb{X}^\top \mathbf{Y}, $$
+
+which is such that 
+
+$$ \mathbb{E}[\widehat{\boldsymbol{\beta}}] = \boldsymbol{\beta} \quad \mbox{and} \quad \mathrm{Cov}[\widehat{\boldsymbol{\beta}}] = \sigma^2 (\mathbb{X}^\top \mathbb{X})^{-1}. $$
+
+In particular, the variance of a single coefficient estimator is given by:
+
+$$ \mathrm{Var}[\widehat{\beta}_j] = \sigma^2 \left[ (\mathbb{X}^\top \mathbb{X})^{-1} \right]_{jj}. $$
+
+The `std.error` is the square root of an estimate of that variance produced by the following estimator:
+
+$$ \widehat{\mathrm{Var}[\widehat{\beta}_j]} = \frac{\widehat{\sigma^2}}{\sum_{i=1}^n x_{ij}^2} = \frac{\widehat{\boldsymbol{\varepsilon}}^\top \widehat{\boldsymbol{\varepsilon}}}{n - k - 1} \left[ (\mathbb{X}^\top \mathbb{X})^{-1} \right]_{jj}. $$
+
+- `statistic` and `p.value`. These columns report the value of a test statistic from the observed data and associated $p$-value for testing $H_0: \beta_j = 0$ vs. $H_1: \beta_j \ne 0$. The `statistic` is nothing but `estimate` / `std.error`. Under the null hypothesis and the assumption of normality of the residuals, it follows a Student's distribution with $n - k - 1$ degrees of freedom, hence the $p$-value.
+
+[**broom::augment()**](https://broom.tidyverse.org/reference/augment.lm.html)
+
+```{r first-data-lm-augment}
+broom::augment(first_model)
+```
+
+This function retrieves information about each individual observations and the distribution of associated estimators:
+
+- `first_data`. These are the observed responses. Note that the name of this column is given by the name of your response variable.
+- `x`. These are the values taken by the predictor in correspondence to each observed response. Note that you might here have more than one column depending on the number of predictors you put in your model. Again, the name of the variables here matches the name of your predictors.
+- `.fitted` and `.se.fit`. The `.fitted` column is produced by the estimator
+
+$$ \widehat{\mathbf{Y}} = \mathbb{H} \mathbf{Y} = \mathbb{X} (\mathbb{X}^\top \mathbb{X})^{-1} \mathbb{X}^\top \mathbf{Y}, $$
+
+which is such that 
+
+$$ \mathbb{E}[\widehat{\mathbf{Y}}] = \mathbb{X} \boldsymbol{\beta} \quad \mbox{and} \quad \mathrm{Cov}[\widehat{\mathbf{Y}}] = \sigma^2 \mathbb{X} (\mathbb{X}^\top \mathbb{X})^{-1} \mathbb{X}^\top = \sigma^2 \mathbb{H}. $$
+
+In particular, the variance of a single model response estimator is given by:
+
+$$ \mathrm{Var}[\widehat{Y}_i] = \sigma^2 h_{ii}. $$
+
+The `.se.fit` is the square root of an estimate of that variance produced by the following estimator:
+
+$$ \widehat{\mathrm{Var}[\widehat{Y}_i]} = \widehat{\sigma^2} h_{ii}. $$
+
+- `.resid`. These are the residuals computed via:
+
+$$ \widehat{\boldsymbol{\varepsilon}} = \mathbf{Y} - \widehat{\mathbf{Y}} = (\mathbb{I}_n - \mathbb{H}) \mathbf{Y}. $$
+
+- `.hat`. These are the leverage scores, *i.e.* the diagonal entries of the hat matrix $\mathbb{H}$.
+- `.sigma`. These are the square root of individual error variance estimates obtained via the following estimator:
+
+$$ \widehat{\sigma_i^2} = \frac{\widehat{\boldsymbol{\varepsilon}}_{(-i)}^\top \widehat{\boldsymbol{\varepsilon}}_{(-i)}}{n - k - 2}, $$
+
+where $\widehat{\boldsymbol{\varepsilon}}_{(-i)}$ is the vector of residuals without the $i$-*th* residual.
+
+- `.std.resid`. These are the standardized residuals computed via:
+
+$$ r_i = \frac{\widehat{\varepsilon}_i}{\sqrt{\widehat{\sigma^2} (1 - h_{ii})}}. $$
+
+- `.cooksd`. These are the Cook's distances computed via:
+
+$$ D_i = \frac{r_i^2}{k + 1} \frac{h_{ii}}{1 - h_{ii}}. $$
+
+### Third step: Model Diagnosis
+
+You must always remember that, **even though R facilitates computations, it does not verify for you that the assumptions required by the model are met by your data**!
+
+This is where *model diagnosis* comes into play. You can almost entirely diagnose your model graphically. Using the grammar of graphics in `ggplot2`, this can be achieved using the extension [**lindia**](https://github.com/astamm/lindia/tree/fix-residuals), that you can also find by borwsing [ggplot extensions](http://www.ggplot2-exts.org/gallery/). In particular, the function `lindia::gg_diagnose()` shows the relevant plots for diagnosis all at once.
+
+Let us diagnose the first model:
+
+```{r diagnose-mod1, fig.align='center'}
+lindia::gg_diagnose(fitted.lm = first_model, plot.all = FALSE)
+```
+
+**Summary: How to use the diagnosis plots?**
+
+- *Histogram of residuals* and *Normal QQ plot*: to check the normality of residuals;
+- *Residuals vs. predictors* and *Residuals vs. fitted values*: to check for non-linearity not accounted for;
+- *Scale-Location plot*: to check the homoskedasticity assumption (constant variance);
+- *Residuals vs. leverage*: to check the zero-mean assumption on the residuals and to spot potential outliers in the top and bottom right corners;
+- *Cook's distance plot*: to spot potential outliers as flagged using a variety of thresholds.
+
+**A note on Cook's distance threshold.** 
+
+Some texts recommend to flag as outliers observations with a Cook's distance greater than $1$. Other textbooks use the theshold $4/n$. John Fox, in his booklet on regression diagnostics is rather cautious when it comes to giving numerical thresholds. He advises the use of graphics and to examine in closer details the points with
+
+> values of D that are substantially larger than the rest (thresholds should just be used to enhance graphical displays), John Fox (1991), *Regression Diagnostics: An Introduction*, Sage Publications.
+
+A theoretically justified approach can be achieved by looking at the distributional properties. If the error vector $\boldsymbol{\varepsilon}$ follows a multivariate Gassian distribution:
+
+$$ \boldsymbol{\varepsilon} \sim \mathcal{N}_n(\mathbf{0}, \sigma^2 I_n), $$
+
+then it can be [proved](https://stats.stackexchange.com/questions/400217/squared-internally-studentized-residual-over-n-p-is-beta-distributed) that each squared standardized residual follows a *Beta distribution*:
+
+$$ \frac{r_i^2}{n - k - 1} \sim \mathcal{B}eta \left( \frac{1}{2}, \frac{n - k - 2}{2} \right). $$
+
+Thus we end up with the following distribution for Cook's distance:
+
+$$ \frac{k+1}{n - (k+1)} \frac{1 - h_{ii}}{h_{ii}} D_i \sim \mathcal{B}eta \left( \frac{1}{2}, \frac{n - k - 2}{2} \right). $$
+
+As a result, in average, we should not observe more than $n_\mathrm{authorized} = \alpha n$ observations having a Cook's distance that exceeds the quantile of order $1 - \alpha$ of the above Beta distribution. Let $n_\mathrm{beta}$ be the number of observations with a Cook's distance that *effectively* exceeds the quantile of order $1 - \alpha$ of the above Beta distribution. We can finally flag as outliers those $n_\mathrm{beta} - n_\mathrm{authorized}$ observations with highest Cook's distance, if any.
+
+```{r diagnose-mod1-cook, fig.align='center'}
+lindia::gg_cooksd(fitted.lm = first_model, threshold = "theoretical")
+```
+
+**Application of model diagnosis to the second data set.**
+
+We can now apply all of the above to the second simulated data to see what happens.
+
+```{r second-data-lm}
+second_model <- lm(second_data ~ x)
+broom::glance(second_model)
+broom::tidy(second_model)
+broom::augment(second_model)
+```
+
+```{r diagnose-mod2, fig.align='center'}
+lindia::gg_diagnose(fitted.lm = second_model, plot.all = FALSE)
+```
+
+```{r diagnose-mod2-cook, fig.align='center'}
+lindia::gg_cooksd(fitted.lm = second_model, threshold = "theoretical")
+```
+
+## More complex models
+
+### Model specification
+
+**First, you need a piece of paper or a blackboard to write down properly the model that you intend to fit.**
+
+Next, R can help you with the fitting by doing the maths through the function `lm()` to which you must pass a [**formula**](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/formula.html) object in the following manner:
+
+```{r model-spec, eval=FALSE}
+mod <- lm(formula = response ~ predictors, data = fancy_data)
+```
+
+The first argument is a [**formula**](https://stat.ethz.ch/R-manual/R-devel/library/stats/html/formula.html). There are two parts to a formula separated by the `~` operator. For regression modeling with a unique response variable, they are structured like this:
+
+- the left-hand side of `~` must contain the response variable as named in the atomic vector storing its values or in the data set containing it;
+- the right-hand side specifies the predictors and will therefore be a combination of potentially transformed variables from your data set (or from atomic vectors defined in your R enviornment).
+
+To get the proper syntax for the rhs of the formula, you should be know the set of allowed operators that have a specific interpretation by R when used within a formula:
+
+- `+`: for adding terms.
+- `-`: for removing terms.
+- `:`: for adding interaction terms only.
+- `*`: for crossing variables, *i.e.* adding variables and their interactions.
+- `%in%`: for nesting variables, *i.e.* adding one variable and its interaction with another.
+- `^`: for limiting variable crossing to a specified order
+- `.`: for adding all other variables in the matrix that have not yet been included in the model.
+
+In regression analysis, we are not interested in the case when all predictors are categorical variables. This is more about grouping the data and looking at the average response value per group. So let us assume that there is at least one continuous predictor that, in absence of context, will be denoted by `x`. Also, linear regression assumes that the response variable is a continuous variable that will be denoted by `y` in absence of context.
+
+The following table summarizes the effect of the some of the above operators when adding a variable `z` to the model predictors. When `z` is categorical, we assume that it can take $h$ unique possible values $z_0, z_1, \dots, z_{h-1}$.
+
+Type of `z` | Formula             | Model
+----------- | ------------------- | --------------------
+Continuous  | `y ~ x + z`         | $Y = \beta_0 + \beta_1 x + \beta_2 z + \varepsilon$
+Continuous  | `y ~ x : z`         | $Y = \beta_0 + \beta_1 x z + \varepsilon$
+Continuous  | `y ~ x + z + x : z` | $Y = \beta_0 + \beta_1 x + \beta_2 z + \beta_3 x z + \varepsilon$
+Continuous  | `y ~ x * z`         | $Y = \beta_0 + \beta_1 x + \beta_2 z + \beta_3 x z + \varepsilon$
+Categorical | `y ~ x + z`         | $Y = \beta_0^{(0)} + \sum_{\ell = 1}^{h-1} \beta_\ell^{(0)} \delta_{\{z = z_\ell\}} + \beta_1^{(1)} x + \varepsilon$
+Categorical | `y ~ x : z`         | $Y = \beta_0^{(0)} + \beta_1^{(1)} x + \sum_{\ell = 1}^{h-1} \beta_\ell^{(1)} x \delta_{\{z = z_\ell\}} + \varepsilon$
+Categorical | `y ~ x + z + x : z` | $Y = \beta_0^{(0)} + \sum_{\ell = 1}^{h-1} \beta_\ell^{(0)} \delta_{\{z = z_\ell\}} + \beta_0^{(1)} x + \sum_{\ell = 1}^{h-1} \beta_\ell^{(1)} x \delta_{\{z = z_\ell\}} + \varepsilon$
+Categorical | `y ~ x * z`         | $Y = \beta_0^{(0)} + \sum_{\ell = 1}^{h-1} \beta_\ell^{(0)} \delta_{\{z = z_\ell\}} + \beta_0^{(1)} x + \sum_{\ell = 1}^{h-1} \beta_\ell^{(1)} x \delta_{\{z = z_\ell\}} + \varepsilon$
+
+What strikes from the above table is that the natural multiplication of variables *within a formula* does not simply adds the product of the predictors in the model but also the predictors themselves. 
+
+What if you want to actually perform an arithmetic operation on your predictors to include a transformed predictor in your model? For example, you might want to include both $x$ and $x^2$ in your model. You have two options:
+
+1. You compute all of the (possibly transformed) predictors you want to include in your model beforehand and store them in the data set (remember `dplyr::mutate()` which will help you achieve this goal easily); or,
+2. You use the *as-is* operator `I()`. In this case, you instruct `lm()` that the operations declared within `I()` must be performed outside from the formula environment and before generating the design matrix for the model.
+
+**Examples: models for the `ggplot2::mpg` data set.**
+
+Let us see a couple of model examples on the `ggplot2::mpg` data set. First, let us see what is in the data set:
+
+```{r mpg-skim}
+skimr::skim(mpg)
+```
+
+Let us model the `hwy` (highway miles per gallon) variable as a function of `displ` (engine displacement, in litres), adding the categorical variable `drv` (front-wheel vs. rear-wheel vs. 4-wheel drive).
+
+First, visualize:
+
+```{r mpg-viz, fig.align='center'}
+mpg %>% 
+  ggplot(aes(displ, hwy, color = drv)) + 
+  geom_point() + 
+  theme_bw()
+```
+
+Note the names of the possible values of the categorical variable `drv`, which will help us in understanding the output of the `lm()` function later on:
+
+```{r mpg-drv-levels}
+unique(mpg$drv)
+```
+
+Let us define a first simple model and use `modelr::model_matrix()` to examine the design matrix $\mathbb{X}$ that `lm()` generates from the formula:
+
+```{r mpg-mod1}
+m1 <- hwy ~ displ + drv
+modelr::model_matrix(mpg, m1)
+mod1 <- lm(m1, mpg)
+broom::glance(mod1)
+broom::tidy(mod1)
+```
+
+Let us visualize the predictions from this model:
+
+```{r mpg-viz-mod1, fig.align='center'}
+mpg %>% 
+  modelr::add_predictions(mod1) %>% 
+  ggplot(aes(displ, hwy, color = drv)) + 
+  geom_point() + 
+  geom_line(aes(y = pred), size = 1) + 
+  theme_bw()
+```
+
+Even before looking at the diagnosis plots, this model is not that satisfactory because it is visible that, in each category of the `drv` variable, the relationship between `hwy` and `displ` is non-linear.
+
+We can try log-transforming `displ`:
+
+```{r mpg-mod2}
+m2 <- hwy ~ I(log(displ)) + drv
+mod2 <- lm(m2, mpg)
+broom::glance(mod2)
+broom::tidy(mod2)
+```
+
+And again visualize the predictions from this model:
+
+```{r mpg-viz-mod2, fig.align='center'}
+mpg %>% 
+  modelr::add_predictions(mod2) %>% 
+  ggplot(aes(displ, hwy, color = drv)) + 
+  geom_point() + 
+  geom_line(aes(y = pred), size = 1) + 
+  theme_bw()
+```
+
+We can additionnally estimate different slopes for each possible value of `drv`:
+
+```{r mpg-mod3}
+m3 <- hwy ~ I(log(displ)) * drv
+mod3 <- lm(m3, mpg)
+broom::glance(mod3)
+broom::tidy(mod3)
+```
+
+And again visualize the predictions from this model:
+
+```{r mpg-viz-mod3, fig.align='center'}
+mpg %>% 
+  modelr::add_predictions(mod3) %>% 
+  ggplot(aes(displ, hwy, color = drv)) + 
+  geom_point() + 
+  geom_line(aes(y = pred), size = 1) + 
+  theme_bw()
+```
+
+**Notes.**
+
+1. Pay attention to the use of functions from the [**modelr**](https://modelr.tidyverse.org) package, which provides functions that help you create elegant pipelines when modelling. In the above examples, we used it for two purposes:
+
+    - Add the predictions from a model to the data set used for estimating the model with `modelr::add_predictions()`; you can similarly add the residuals to the original data set with `modelr::add_residuals()`;
+    - Inspect the design matrix $\mathbb{X}$ that a given formula produces via `modelr::model_matrix()`.
+
+2. The [**ggplot2**](https://ggplot2.tidyverse.org) package is not fully featured for visualizing interactions (it is not meant to be).
+
+### Exploring interactions
+
+See the [**interactions**](https://interactions.jacob-long.com) package, especially the [vignette](https://cran.r-project.org/web/packages/interactions/vignettes/interactions.html).
+
+### Testing linear hypotheses
+
+#### Multicollinearity
+
+**Sources.**
+
+- [Multicollinearity Essentials and VIF in R](http://www.sthda.com/english/articles/39-regression-model-diagnostics/160-multicollinearity-essentials-and-vif-in-r/).
+- [ggcorrplot: Visualization of a correlation matrix using ggplot2](http://www.sthda.com/english/wiki/ggcorrplot-visualization-of-a-correlation-matrix-using-ggplot2)
+
+**What is it?**
+
+In regression modeling with many predictors, two or more predictor variables might be **linearly** correlated with each other. This situation is referred as collinearity.
+
+There is an extreme situation, called multicollinearity, where collinearity exists between three or more variables even if no pair of variables has a particularly high linear correlation. This means that there is linear redundancy between predictor variables.
+
+In the presence of multicollinearity, the solution of the regression model becomes unstable because $\mathbb{X}^\top \mathbb{X}$ may become ill-conditioned, leading to artificially inflated variances and other problems.
+
+**Visualizing pairwise collinearity.**
+
+We can visualize pairwise collinearity issues with a correlation plot using the `ggcorrplot()` function from the [**ggcorrplot**](https://rpkgs.datanovia.com/ggcorrplot/) package, which offers the possibility of reordering the correlation matrix, *i.e.* rearranging variables to group them by blocks of *homogeneous* correlation values:
+
+```{r mc, fig.align='center'}
+mpg %>% 
+  modelr::model_matrix(mod2) %>% 
+  dplyr::select(-1) %>% 
+  cor() %>% 
+  ggcorrplot::ggcorrplot(
+    hc.order = TRUE, 
+    type = "lower",
+    lab = TRUE
+  )
+```
+
+**Detecting multicollinearity.**
+
+For a given predictor, multicollinearity can be assessed by computing a score called the *variance inflation factor* (VIF), which measures how much the variance of a regression coefficient is inflated due to multicollinearity in the model:
+
+$$ \mathrm{VIF}_j = \frac{1}{1 - R_j^2}, $$
+
+where $R_j^2$ is the coefficient of determination of the regression of the $j$-th predictor w.r.t. all the other predictors. The smallest possible value of VIF is 1 (absence of multicollinearity). As a rule of thumb, a VIF value that exceeds 5 or 10 indicates a problematic amount of collinearity.
+
+When faced to multicollinearity, the concerned variables should be removed, since the presence of multicollinearity implies that the information that this variable provides about the response is redundant in the presence of the other variables.
+
+#### Model selection
+
+*Source:* [Stepwise regression](https://en.wikipedia.org/wiki/Stepwise_regression)
+
+The two main approaches are:
+
+- **Forward selection**, which involves starting with no variables in the model, testing the addition of each variable using a chosen model fit criterion, adding the variable (if any) whose inclusion gives the most statistically significant improvement of the fit, and repeating this process until none improves the model to a statistically significant extent.
+- **Backward elimination**, which involves starting with all candidate variables, testing the deletion of each variable using a chosen model fit criterion, deleting the variable (if any) whose loss gives the most statistically insignificant deterioration of the model fit, and repeating this process until no further variables can be deleted without a statistically significant loss of fit.
+
+A list of possible and often used model fit criterion is available on the [Wikipedia Model Selection](https://en.wikipedia.org/wiki/Model_selection) page. In R, the basic `stats::step()` function uses the Akaike's information criterion (AIC) and allows to perform forward selection (`direction = "forward"`) or backward elimination (`direction = "backward"`).
+
+In adding or eliminating predictors in presence of interactions, predictors are grouped by order of interactions, i.e. main first-order interactions (main variables), second-order interactions, etc. For elimination, the group of predictors corresponding to the highest-order interactions is assessed first while for inclusion, it is the reverse.
+
+Let us see examples using the `swiss` data set from the **datasets** base R package. It reports a standardized fertility measure and socio-economic indicators for each of the 47 French-speaking provinces of Switzerland at about 1888:
+
+Variable name    | Description
+---------------- | -------------
+fertility	       | Common standardized fertility measure
+agriculture	     | % of males involved in agriculture as occupation
+examination      | % of draftees receiving highest mark on army examination
+education	       | % of draftees receiving education beyond primary school
+catholic         | % of catholic (as opposed to protestant)
+infant_mortality | live births who live less than 1 year
+
+```{r swiss-skim}
+swiss <- swiss %>% 
+  tibble::as_tibble() %>% 
+  janitor::clean_names()
+skimr::skim(swiss)
+```
+
+**Backward elimination.**
+
+```{r swiss-backward}
+initial_model_backward <- lm(fertility ~ .^2, data = swiss)
+step(
+  object = initial_model_backward, 
+  direction = "backward"
+)
+```
+
+**Forward selection.**
+
+```{r swiss-forward-attempt}
+initial_model_forward <- lm(fertility ~ 1, data = swiss)
+step(
+  object = initial_model_forward, 
+  direction = "forward", 
+  scope = fertility ~ .^2
+)
+```
+
+This substantially does nothing. Why? In the *Details* section of the help for `step()`, you can read:
+
+> Models specified by scope can be templates to update object as used by update.formula. So using . in a scope formula means ‘what is already there’, with .^2 indicating all interactions of existing terms.
+
+So R creates the upper scope model by combining all predictors in the initial model up to the second-order interactions. But the initial model is the null model, so there are no predictors to combine!
+
+```{r swiss-forward}
+initial_model_forward <- lm(fertility ~ 1, data = swiss)
+step(
+  object = initial_model_forward, 
+  direction = "forward", 
+  scope = fertility ~ (agriculture + examination + education + catholic + infant_mortality)^2
+)
+```
+
+**Notes.**
+
+1. Are the final models the same when using backward elimination or forward selection?
+2. There are many other ways to perform model selection. See the [**olsrr**](https://olsrr.rsquaredacademy.com) package for an implementation of many of them. One [interesting and funny approach](https://onlinelibrary.wiley.com/doi/pdf/10.1002/asmb.446) (not implemented in [**olsrr**](https://olsrr.rsquaredacademy.com)) borrows ideas from co-operative game theory: it uses the Shapley–Shubik power index, which was formulated by Lloyd Shapley and Martin Shubik in 1954 to measure the powers of players in a voting game. In the context of regression analysis, it is used to measure the importance of predictors in explaining the response and it has been shown to provide consistent results in the presence of multicollinearity.
+
+**DO NOT FORGET TO PERFORM MODEL DIAGNOSIS ONCE YOU ARE HAPPY WITH A MODEL.**
+
+## Box-Cox transformations and beyond
+
+The purpose of transforming data is whenever your response random vector $\mathbf{Y}$ cannot be assumed to follow a Gaussian distribution. It is, in some cases, possible to find a *parametric* transformation $h_\lambda: \mathbb{R} \to \mathbb{R}$ such that $h_\lambda(\mathbf{Y}) \sim \mathcal{N}_n(\mathbb{X} \boldsymbol{\beta}, \sigma^2 \mathbb{I}_n)$.
+
+Once you specify the parametric family of transformations to look at, you can then estimate the optimal parameter(s) for instance by maximizing the likelihood.
+
+### Box-Cox Transformation
+
+The first family of transformations was proposed by Box and Cox, in their 1964 seminal paper on the topic, which gave its name to the Box-Cox transformations:
+
+$$ h_\lambda^\mathrm{BC}(y) = \begin{cases} \frac{(y + c)^\lambda - 1}{\lambda}, & \mbox{if } \lambda \ne 0 \\ \log(y + c), & \mbox{if } \lambda = 0, \end{cases} $$
+where $c$ is a constant such that $y + c > 0$, for any $y$.
+
+### Yeo-Johnson Transformation
+
+Since then, there has been a lot of variants around this family of transformations. The Yeo-Johnson transformation is particularly popular because it has a clear interpretation: *it minimizes the Kullback-Leibler distance between the normal distribution and the transformed distribution*. The corresponding family of transformations reads:
+
+$$ h_\lambda^\mathrm{YJ}(y) = \begin{cases} \frac{(y + 1)^\lambda - 1}{\lambda}, & \mbox{if } \lambda \ne 0, \quad y \ge 0, \\ \log(y + 1), & \mbox{if } \lambda = 0, \quad y \ge 0, \\ \frac{(1 - y)^{2 - \lambda} - 1}{\lambda - 2}, & \mbox{if } \lambda \ne 2, \quad y < 0, \\ -\log(1 - y), & \mbox{if } \lambda = 2, \quad y < 0. \end{cases} $$
+It also presents the advantage of naturally accommodating negative values w.r.t. the Box-Cox transformation.
+
+### Implementations in R
+
+The [**recipes**](https://tidymodels.github.io/recipes/index.html) package has built-in functions [step_BoxCox](https://tidymodels.github.io/recipes/reference/step_BoxCox.html) and [step_YeoJohnson](https://tidymodels.github.io/recipes/reference/step_YeoJohnson.html) to include data transformations to normality as a data preprocessing step before further modeling.
+
+## Exercises
+
+### Some remarks before starting
+
+
+**The [olsrr](https://olsrr.rsquaredacademy.com) package.**
+
+It provides a set of tools for improved output from linear regression models, designed mainly for beginner/intermediate R users. The package includes:
+
+- comprehensive regression output
+- variable selection procedures
+- heteroskedasticiy, collinearity diagnostics and measures of influence
+- various plots and underlying data
+
+**Resolution of the exercises.**
+
+In the following exercises, you will be asked to study the relationship of a continuous response variable and one or more predictors. In doing so, remember to:
+
+- perform model diagnosis
+- including visualization tools
+- including multicollinearity assessment
+- perform informed model selection
+- comment each result of an analysis you run with R
+
+### Exercise 1
+
+Analysis of the `production` data set which is composed of the following variables: 
+
+Variable name | Description
+------------- | -------------
+x             | Number of produced pieces
+y             | Production cost
+
+Study the relationship between `x` and `y`.
+
+```{r production, exercise=TRUE, exercise.lines=10}
+
+```
+
+### Exercise 2
+
+Analysis of the `brain` data set which is composed of the following variables:
+
+Variable name | Description
+------------- | -------------
+body_weight   | Body weight in kg
+brain_weight  | Brain weight in kg
+
+Study the relationship between body and brain weights, to establish how the variable `brain_weight` changes with the variable `body_weight`.
+
+```{r brain, exercise=TRUE, exercise.lines=10}
+
+```
+
+### Exercise 3
+
+Analysis of the `anscombe` data set which is composed of the following variables:
+
+Variable name | Description
+------------- | -------------
+x1            | Predictor to be used for explaining `y1`
+x2            | Predictor to be used for explaining `y2`
+x3            | Predictor to be used for explaining `y3`
+x4            | Predictor to be used for explaining `y4`
+y1            | Response to be explained by `x1`
+y2            | Response to be explained by `x2`
+y3            | Response to be explained by `x3`
+y4            | Response to be explained by `x4`
+
+Study the relationship between each $y_i$ and the corresponding $x_i$. 
+
+```{r anscombe, exercise=TRUE, exercise.lines=10}
+
+```
+
+### Exercise 4
+
+Analysis of the `cement` data set, which contains the following variables:
+
+Variable name     | Description
+----------------- | ----------------
+aluminium         | Percentage of $\mathrm{Ca}_3 \mathrm{Al}_2 \mathrm{O}_6$
+silicate          | Percentage of $\mathrm{C}_2 \mathrm{S}$
+aluminium_ferrite | Percentage of $4 \mathrm{CaO} \mathrm{Al}_2 \mathrm{O}_3 \mathrm{Fe}_2 \mathrm{O}_3$
+silicate_bic      | Percentage of $\mathrm{C}_3 \mathrm{S}$
+hardness          | Hardness of the cement obtained by mixing the above four components
+
+Study, using a multiple linear regression model, how the variable `hardness` depends on the four predictors.
+
+```{r cement, exercise=TRUE, exercise.lines=10}
+
+```
+
+### Exercise 5
+
+Analysis of the `job` data set, which contains the following variables:
+
+Variable name | Description
+------------- | ----------------
+average_score | Average score obtained by the employee in the test
+years_service | Number of years of service
+sex           | Male or female
+
+We want to see if it is possible to use the sex of the person in addition to the years of service to predict, with a linear model, the average score obtained in the test. Estimate a linear regression of `average_score` vs. `years_service`, considering the categorical variable `sex`.
+
+```{r job, exercise=TRUE, exercise.lines=10}
+
+```
+
+### Exercise 6
+
+Analysis of the `cars` data set, which contains the following variables:
+
+Variable name | Description
+------------- | ----------------
+speed         | Speed of the car before starting braking
+dist          | Distance travelled by the car during the braking period until it completely stops
+
+Verify if the distance travelled during the braking depends on the starting velocity of the car:
+
+1. Choose the best model to explain the distance as function of the speed,
+2. Predict the braking distance for a starting velocity of 25 km/h, using a point estimate and a prediction interval.
+
+```{r cars, exercise=TRUE, exercise.lines=10}
+
+```
+
+### Exercise 7
+
+Analysis of the `mussels` data set, which contains the following variables:
+
+Variable name | Description
+------------- | ----------------
+length        | Length of a mussel (mm)
+width         | Width of a mussel (mm)
+height        | Height of a mussel (mm)
+size          | Mass of a mussel (g)
+weight        | Weight of eatable part of a mussel (g)
+
+We want to study how the eatable part of a mussel varies as a function of the other four variables using a multiple linear regression.
+
+```{r mussels, exercise=TRUE, exercise.lines=10}
+
+```

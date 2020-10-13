@@ -1,0 +1,709 @@
+---
+title: "Transforming data with R"
+tutorial:
+  id: "e0c77158-ee64-4891-b52a-1308d604cf84"
+  version: 1.0
+output: learnr::tutorial
+runtime: shiny_prerendered
+author: Aymeric Stamm
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(testwhat)
+library(magrittr)
+
+tutorial_options(
+  exercise.timelimit = 60,
+  exercise.checker = testwhat::testwhat_learnr
+)
+knitr::opts_chunk$set(comment = NA)
+```
+
+## Disclaimer
+
+This tutorial is in many parts built from tutorials published on GitHub by RStudio and its Education team, mainly from their [2-day internal R bootcamp](https://github.com/rstudio-education/bootcamper) and from the [RStudio Cloud primers](https://github.com/rstudio-education/primers).
+
+## The [**dplyr**](https://dplyr.tidyverse.org) package
+<img src="https://github.com/tidyverse/dplyr/raw/master/man/figures/logo.png" alt="dplyr logo" width="64" style="float: right; margin-left: 10px; margin-right: 10px;"/>
+
+A grammar of data wrangling based on the concepts of functions as verbs that manipulate tibbles
+
+- `select`: pick columns by name
+- `arrange`: reorder rows
+- `slice`: pick rows using index(es)
+- `filter`: pick rows matching criteria
+- `distinct`: filter for unique rows
+- `mutate`: add new variables
+- `summarise`: reduce variables to values
+- `pull`: grab a column as a vector
+- ... (many more)
+
+### Rules of [**dplyr**](https://dplyr.tidyverse.org) functions
+
+- First argument is *always* a tibble
+- Subsequent arguments say what to do with that tibble
+- Always return a tibble
+- Don't modify in place
+
+### Bike crashes in NC 2007 - 2014
+
+```{r ncbikecrash-glimpse}
+ncbikecrash <- readr::read_csv("www/ncbikecrash.csv")
+dplyr::glimpse(ncbikecrash)
+```
+
+### Variables
+
+```{r ncbikecrash-variables}
+names(ncbikecrash)
+```
+
+### Select columns
+
+```{r ncbikecrash-select}
+dplyr::select(ncbikecrash, county, bike_age)
+```
+
+**Question:** What if we wanted to select these columns, and then arrange the data in ascending order of biker age?
+
+### Data wrangling, step-by-step
+
+Select, then arrange:
+```{r ncbikecrash-selarr}
+ncbikecrash %>%
+  dplyr::select(county, bike_age) %>%
+  dplyr::arrange(bike_age)
+```
+
+## Pipes
+
+### What is a pipe?
+
+In programming, a pipe is a technique for passing information from one process to another.
+
+```{r ncbikecrash-selarr-explained-1, eval=FALSE}
+ncbikecrash %>%
+  dplyr::select(county, bike_age) %>%
+  dplyr::arrange(bike_age)
+```
+
+- Start with the tibble `ncbikecrash`,
+- Pass it to the `select()` function for selecting `county` and `bike_age` variables only,
+- Arrange the resulting two-column tibble by ascending order of the values of the variable `bike_age`.
+
+```{r ncbikecrash-selarr-explained-2, echo=FALSE}
+ncbikecrash %>%
+  dplyr::select(county, bike_age) %>%
+  dplyr::arrange(bike_age)
+```
+
+### How does a pipe work?
+
+- You can think about the following sequence of actions - find key, unlock car, start car, drive to school, park.
+- Expressed as a set of nested functions in R pseudocode this would look like:
+```{r pipe-explained-1, eval=FALSE}
+park(drive(start_car(find("keys")), to = "work"))
+```
+- Writing it out using pipes give it a more natural (and easier to read) structure:
+```{r pipe-explained-2, eval=FALSE}
+find("keys") %>%
+  start_car() %>%
+  drive(to = "work") %>%
+  park()
+```
+
+### What about other arguments?
+
+Use the dot `.` to
+
+- send results to a function argument other than first one; or, 
+- use the previous result for multiple arguments
+
+```{r pipe-dot}
+dplyr::starwars %>%
+  dplyr::filter(species == "Human") %>%
+  lm(mass ~ height, data = .)
+```
+
+**Your turn**
+
+- Does the above code work? 
+- Did you expect it to work? 
+- Why does it work? 
+- Modify it to make it less error-prone:
+
+```{r pipe-dot-ex, exercise=TRUE}
+dplyr::starwars %>%
+  dplyr::filter(species == "Human") %>%
+  lm(mass ~ height, data = .)
+```
+
+### Code styling
+
+- always a space before the pipe
+- always a line break after (for pipelines with more than 2 lines)
+
+#### None of this...
+
+```{r code-styling-1, eval=FALSE}
+dplyr::starwars%>%dplyr::filter(species == "Human")%>%lm(mass ~ height, data = .)
+```
+
+#### More of this...
+
+```{r code-styling-2, exercise=TRUE}
+dplyr::starwars %>% 
+  dplyr::filter(species == "Human") %>% 
+  lm(mass ~ height, data = .)
+```
+
+## Data wrangling with dplyr
+
+### `select` to keep variables
+
+```{r select-keep}
+ncbikecrash %>%
+  dplyr::select(locality, speed_limit)
+```
+
+### `select` to exclude variables
+
+```{r select-exclude}
+ncbikecrash %>%
+  dplyr::select(-object_id)
+```
+
+### `select` a range of variables
+
+```{r select-range}
+ncbikecrash %>%
+  dplyr::select(city:locality)
+```
+
+### `select` variables with certain characteristics
+
+```{r select-sw}
+ncbikecrash %>%
+  dplyr::select(dplyr::starts_with("bike_"))
+```
+
+```{r select-ew}
+ncbikecrash %>%
+  dplyr::select(dplyr::ends_with("age"))
+```
+
+### Variable selection helpers for `select()`
+
+- `starts_with()`: Starts with a prefix
+- `ends_with()`: Ends with a suffix
+- `contains()`: Contains a literal string
+- `num_range()`: Matches a numerical range like x01, x02, x03
+- `one_of()`: Matches variable names in a character vector
+- `everything()`: Matches all variables
+- `last_col()`: Select last variable, possibly with an offset
+- `matches()`: Matches a regular expression (a sequence of symbols/characters expressing a string/pattern to be searched for within text)
+
+### `arrange` in ascending / descending order
+
+```{r arrange-ascending}
+ncbikecrash %>%
+  dplyr::select(dplyr::ends_with("age")) %>%
+  dplyr::arrange(bike_age)
+```
+
+```{r arrange-descending}
+ncbikecrash %>%
+  dplyr::select(dplyr::ends_with("age")) %>%
+  dplyr::arrange(dplyr::desc(bike_age))
+```
+
+### `slice` for certain row numbers
+
+- First five
+
+```{r slice-first}
+ncbikecrash %>%
+  dplyr::slice(1:5)
+```
+
+- Last five
+ 
+```{r slice-last}
+last_row <- nrow(ncbikecrash)
+ncbikecrash %>%
+  dplyr::slice((last_row - 4):last_row)
+```
+
+### `filter` to select a subset of rows
+
+- Crashes in Durham County
+
+```{r filter-single}
+ncbikecrash %>%
+  dplyr::filter(county == "Durham")
+```
+
+- Crashes in Durham County where biker is 0-5 years old
+
+```{r filter-multiple}
+ncbikecrash %>%
+  dplyr::filter(
+    county == "Durham",  
+    bike_age_group == "0-5"
+  )
+```
+
+*Note that passing multiple conditions separated by a comma is interpreted by `filter()` as the `AND` logical operator.*
+
+### Logical operators in R
+
+operator      | definition                   
+--------------|---------------------------
+`<`           | less than
+`<=`          |	less than or equal to
+`>`           | greater than
+`>=`          |	greater than or equal to
+`==`          |	exactly equal to
+`!=`          |	not equal to
+`x & y`       | `x` AND `y`
+`x | y`       | `x` OR `y`
+`is.na(x)`    | test if `x` is `NA`
+`!is.na(x)`   | test if `x` is not `NA`
+`x %in% y`    | test if `x` is in `y`
+`!(x %in% y)` | test if `x` is not in `y`
+`!x`          | not `x`
+
+### `distinct` to filter for unique rows
+
+... and `arrange` to order alphabetically:
+
+- If you explictly give variable names to `distinct()`, it filters out duplicates only for this/these variables
+
+```{r distinct-single}
+ncbikecrash %>% 
+  dplyr::distinct(county) %>%
+  dplyr::arrange(county)
+```
+
+- If you use `distinct()` without explicit variable names, it filters out row duplicates on all variables jointly
+
+```{r distinct-tibble}
+ncbikecrash %>% 
+  dplyr::select(county, city) %>% 
+  dplyr::distinct() %>%
+  dplyr::arrange(county, city)
+```
+
+### Exercises
+
+#### Exercise 1
+
+Fill in the blanks for filtering the data set `ncbikecrash` for crashes **not** in Durham County where crash year is after 2012 and `bike_position` is not missing.
+
+```{r exo1, exercise=TRUE, exercise.lines=10}
+ncbikecrash <- readr::read_csv("https://github.com/astamm/teachr/raw/master/inst/tutorials/04_TransformingData/www/ncbikecrash.csv")
+ncbikecrash %>%
+  dplyr::filter(
+    county ____ "Durham", 
+    crash_year ____ 2012,
+    ____
+  )
+```
+
+#### Exercise 2.
+
+How many bike crashes occurred in residential development areas where the 
+driver was between 0 and 19 years old?
+
+```{r exo2, exercise=TRUE, exercise.lines=10}
+ncbikecrash <- readr::read_csv("https://github.com/astamm/teachr/raw/master/inst/tutorials/04_TransformingData/www/ncbikecrash.csv")
+
+```
+
+#### Exercise 3.
+
+- Create a frequency table of the estimated speed of the car (`driver_est_speed`) 
+involved in the crash using the `janitor::tabyl()` function (don't hesitate to see `?janitor::tabyl()` for help on how the function works;
+- What is the most common estimated speed range in the data set (use `dplyr::arrange()` wisely) ?
+
+```{r exo3, exercise=TRUE, exercise.lines=10}
+ncbikecrash <- readr::read_csv("https://github.com/astamm/teachr/raw/master/inst/tutorials/04_TransformingData/www/ncbikecrash.csv")
+
+```
+
+### `count` to create frequency tables
+
+```{r count}
+ncbikecrash %>%
+  dplyr::count(bike_age_group)
+```
+
+#### With `arrange`
+
+```{r count-arrange}
+ncbikecrash %>%
+  dplyr::count(bike_age_group) %>%
+  dplyr::arrange(desc(n))
+```
+
+#### Multiple variables
+
+```{r count-multiple}
+ncbikecrash %>%
+  dplyr::count(bike_age_group, crash_alcohol)
+```
+
+#### Order matters when you `count`
+
+```{r count-order-1}
+ncbikecrash %>%
+  dplyr::count(bike_age_group, crash_alcohol)
+```
+
+```{r count-order-2}
+ncbikecrash %>%
+  dplyr::count(crash_alcohol, bike_age_group)
+```
+
+### `mutate` to add a new variable
+
+```{r mutate}
+ncbikecrash %>%
+  dplyr::count(bike_age_group, crash_alcohol) %>%
+  dplyr::mutate(proportion = n / sum(n))
+```
+
+### `group_by` for grouped operations
+
+```{r group-by}
+ncbikecrash %>%
+  dplyr::count(bike_age_group, crash_alcohol) %>%
+  dplyr::group_by(bike_age_group) %>%
+  dplyr::mutate(proportion = n / sum(n))
+```
+
+### Aside: fix `bike_age`
+
+```{r bike-age-chr}
+ncbikecrash %>%
+  dplyr::select(bike_age)
+```
+
+```{r bike-age-fix}
+ncbikecrash <- ncbikecrash %>%
+  dplyr::mutate(bike_age_numeric = as.numeric(bike_age))
+ncbikecrash %>%
+  dplyr::select(bike_age, bike_age_numeric)
+```
+
+### `summarise` for summary stats
+
+```{r summarise}
+ncbikecrash %>%
+  dplyr::summarise(mean_bike_age = mean(bike_age_numeric, na.rm = TRUE))
+```
+
+### `group_by` and then `summarise` for grouped summary stats
+
+```{r group-by-summary}
+ncbikecrash %>%
+  dplyr::group_by(crash_alcohol) %>%
+  dplyr::summarise(mean_bike_age = mean(bike_age_numeric, na.rm = TRUE))
+```
+
+## Data joins
+
+```{r data-setup, message=FALSE}
+fisheries <- readr::read_csv("www/fisheries.csv")
+continents <- readr::read_csv("www/continents.csv")
+```
+
+```{r fisheries-desc}
+fisheries
+```
+
+```{r continent-desc}
+continents
+```
+
+### Joining tibbles
+
+```{r jion-template, eval=FALSE}
+something_join(x, y)
+```
+
+- `inner_join()`: all rows from `x` where there are matching values in `y`, return 
+all combination of multiple matches in the case of multiple matches
+- `left_join()`: all rows from `x`
+- `right_join()`: all rows from `y`
+- `full_join()`: all rows from both `x` and `y`
+- `semi_join()`: all rows from `x` where there are matching values in `y`, keeping just columns from `x`.
+- `anti_join()`: return all rows from `x` where there are not matching values in `y`, never duplicate rows of `x`
+- ...
+
+### Setup
+
+For the next few slides, we consider the `x` and `y` tibbles sharing the variable `value`.
+
+```{r example-setup, echo=FALSE}
+x <- tibble::tibble(
+  value = c(1, 2, 3), 
+  animal = c("goat", "horse", "pig")
+)
+y <- tibble::tibble(
+  value = c(1, 2, 4), 
+  color = c("white", "black", "yellow")
+)
+```
+
+- The `x` tibble:
+
+```{r x-show, echo=FALSE}
+x
+```
+
+- The `y` tibble:
+
+```{r y-show, echo=FALSE}
+y
+```
+
+Let us explore the effect of the different `*_join()` functions.
+
+### `inner_join()`
+
+```{r inner-join}
+dplyr::inner_join(x, y)
+```
+
+```{r inner-join-exp, echo=FALSE, fig.align='center'}
+knitr::include_graphics("images/inner-join.gif")
+```
+
+### `left_join()`
+
+```{r left-join}
+dplyr::left_join(x, y)
+```
+
+```{r left-join-exp, echo=FALSE, fig.align='center'}
+knitr::include_graphics("images/left-join.gif")
+```
+
+### `right_join()`
+
+```{r right-join}
+dplyr::right_join(x, y)
+```
+
+```{r right-join-exp, echo=FALSE, fig.align='center'}
+knitr::include_graphics("images/right-join.gif")
+```
+
+### `full_join()`
+
+```{r full-join}
+dplyr::full_join(x, y)
+```
+
+```{r full-join-exp, echo=FALSE, fig.align='center'}
+knitr::include_graphics("images/full-join.gif")
+```
+
+### `semi_join()`
+
+```{r semi-join}
+dplyr::semi_join(x, y)
+```
+
+```{r semi-join-exp, echo=FALSE, fig.align='center'}
+knitr::include_graphics("images/semi-join.gif")
+```
+
+### `anti_join()`
+
+```{r anti-join}
+dplyr::anti_join(x, y)
+```
+
+```{r anti-join-exp, echo=FALSE, fig.align='center'}
+knitr::include_graphics("images/anti-join.gif")
+```
+
+**Question:** We want to keep all rows and columns from `fisheries` and add a column for 
+corresponding continents. Which join function should we use? Let us start by displaying the 2 data sets again:
+
+```{r recall-fisheries, echo=FALSE}
+fisheries
+```
+
+```{r recall-continents, echo=FALSE}
+continents
+```
+
+### Join fisheries and continents 
+
+```{r fish-join}
+fisheries <- dplyr::left_join(fisheries, continents) 
+```
+
+**Question:** How does `left_join()` know to join the two tibbles by `country`?
+
+Let us look at the variables in both data sets:
+
+- Variables in the original fisheries data set
+
+```{r var-fish, echo=FALSE}
+fisheries %>% 
+  dplyr::select(-continent) %>% 
+  names()
+```
+
+- Variables in the continents data set
+
+```{r var-continents, echo=FALSE}
+names(continents)
+```
+
+If we do not provide explicitly variables to join by through the `by` arguments, the `*_join()` function use the combination of all variables present in both tibbles to performm the join.
+
+### Check the join went well
+
+You can check if all countries have been assigned a continent:
+
+```{r missing-continents}
+fisheries %>%
+  dplyr::filter(is.na(continent))
+```
+
+For most of them it is the case, but 21 countries have no continent data. You can fix this manually after the join using `dplyr::case_when()`:
+
+```{r case-when}
+fisheries <- fisheries %>%
+  dplyr::mutate(continent = dplyr::case_when(
+    country == "Democratic Republic of the Congo" ~ "Africa",
+    country == "Hong Kong"                        ~ "Asia",
+    country == "Myanmar"                          ~ "Asia",
+    TRUE                                          ~ continent
+    )
+  )
+```
+
+...and check again:
+
+```{r final-fish-check}
+fisheries %>%
+  dplyr::filter(is.na(continent))
+```
+
+### Exercise
+
+1. Calculate the mean aquaculture (we'll call it `mean_ac` for short) percentage 
+for countries in the `fisheries` data using the `summarise()` function in **dplyr**. 
+Note that the function for calculating the mean is `mean()` in R.
+
+```{r fisheries-mean, exercise=TRUE, exercise.lines=25}
+fisheries <- readr::read_csv("https://github.com/astamm/teachr/raw/master/inst/tutorials/04_TransformingData/www/fisheries.csv")
+continents <- readr::read_csv("https://github.com/astamm/teachr/raw/master/inst/tutorials/04_TransformingData/www/continents.csv")
+fisheries <- fisheries %>%
+  dplyr::filter(total > 100000) %>%
+  dplyr::left_join(continents) %>%
+  dplyr::mutate(
+    continent = dplyr::case_when(
+      country == "Democratic Republic of the Congo" ~ "Africa",
+      country == "Hong Kong"                        ~ "Asia",
+      country == "Myanmar"                          ~ "Asia",
+      TRUE                                          ~ continent
+    ),
+    aquaculture_perc = aquaculture / total
+  )
+
+fisheries %>%                  # start with the fisheries tibble
+  ___(mean_ac = ___)           # calculate mean aquaculture
+```
+
+2. Now expand your calculations to also calculate the minimum and maximum 
+aquaculture percentage for countries in the `fisheries` data. Note that the 
+functions for calculating minimum and maximum in R are `min()` and `max()`
+respectively.
+
+```{r fisheries-summary, exercise=TRUE, exercise.lines=25}
+fisheries <- readr::read_csv("https://github.com/astamm/teachr/raw/master/inst/tutorials/04_TransformingData/www/fisheries.csv")
+continents <- readr::read_csv("https://github.com/astamm/teachr/raw/master/inst/tutorials/04_TransformingData/www/continents.csv")
+fisheries <- fisheries %>%
+  dplyr::filter(total > 100000) %>%
+  dplyr::left_join(continents) %>%
+  dplyr::mutate(
+    continent = dplyr::case_when(
+      country == "Democratic Republic of the Congo" ~ "Africa",
+      country == "Hong Kong"                        ~ "Asia",
+      country == "Myanmar"                          ~ "Asia",
+      TRUE                                          ~ continent
+    ),
+    aquaculture_perc = aquaculture / total
+  )
+
+fisheries %>%                  # start with the fisheries tibble
+  ___(
+    mean_ac = ___,             # calculate mean aquaculture
+    min_ac  = ____,            # calculate min aquaculture
+    max_ac  = ____             # calculate max aquaculture
+  )          
+```
+
+3. Now modify your calculations to calculate  minimum, mean, and maximum aquaculture percentage for each continent in the fisheries data. 
+
+```{r fisheries-summary-continent, exercise=TRUE, exercise.lines=25}
+fisheries <- readr::read_csv("https://github.com/astamm/teachr/raw/master/inst/tutorials/04_TransformingData/www/fisheries.csv")
+continents <- readr::read_csv("https://github.com/astamm/teachr/raw/master/inst/tutorials/04_TransformingData/www/continents.csv")
+fisheries <- fisheries %>%
+  dplyr::filter(total > 100000) %>%
+  dplyr::left_join(continents) %>%
+  dplyr::mutate(
+    continent = dplyr::case_when(
+      country == "Democratic Republic of the Congo" ~ "Africa",
+      country == "Hong Kong"                        ~ "Asia",
+      country == "Myanmar"                          ~ "Asia",
+      TRUE                                          ~ continent
+    ),
+    aquaculture_perc = aquaculture / total
+  )
+
+fisheries %>%
+  ___ %>%                      # ensure calculations are done per continent
+  ___(
+    mean_ac = ___,             # calculate mean aquaculture
+    min_ac  = ____,            # calculate min aquaculture
+    max_ac  = ____             # calculate max aquaculture
+  )                          
+```
+
+4. Finally modify the previous calculations to order the results in descending 
+order of mean aquaculture percentage.
+
+```{r fisheries-summary-continent-sorted, exercise=TRUE, exercise.lines=25}
+fisheries <- readr::read_csv("https://github.com/astamm/teachr/raw/master/inst/tutorials/04_TransformingData/www/fisheries.csv")
+continents <- readr::read_csv("https://github.com/astamm/teachr/raw/master/inst/tutorials/04_TransformingData/www/continents.csv")
+fisheries <- fisheries %>%
+  dplyr::filter(total > 100000) %>%
+  dplyr::left_join(continents) %>%
+  dplyr::mutate(
+    continent = dplyr::case_when(
+      country == "Democratic Republic of the Congo" ~ "Africa",
+      country == "Hong Kong"                        ~ "Asia",
+      country == "Myanmar"                          ~ "Asia",
+      TRUE                                          ~ continent
+    ),
+    aquaculture_perc = aquaculture / total
+  )
+
+fisheries %>%
+  ___ %>%                      # ensure calculations are done per continent
+  ___(
+    mean_ac = ___,             # calculate mean aquaculture
+    min_ac  = ____,            # calculate min aquaculture
+    max_ac  = ____             # calculate max aquaculture
+  ) %>%
+  ___
+```
