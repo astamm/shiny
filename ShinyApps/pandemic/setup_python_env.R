@@ -24,7 +24,9 @@ if (Sys.info()[['user']] == 'shiny'){
 } else if (Sys.info()[['user']] == 'default') {
 
   # Running on Openshift
-  # Do nothing
+  Sys.setenv(PYTHON_PATH = system('which python3', intern = TRUE))
+  Sys.setenv(VIRTUALENV_NAME = VIRTUALENV_NAME)
+  Sys.setenv(RETICULATE_PYTHON = paste0('/opt/app-root/src/.virtualenvs/', VIRTUALENV_NAME, '/bin/python'))
 
 } else {
 
