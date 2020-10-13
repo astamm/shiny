@@ -13,6 +13,8 @@ library(shinyjs)
 library(DT)
 library(ggplot2)
 
+source("setup_python_env.R")
+
 # Define any Python packages needed for the app here:
 PYTHON_DEPENDENCIES <- c('numpy', 'scipy', 'matplotlib')
 
@@ -152,7 +154,7 @@ server <- function(input, output, session) {
     # ------------------ App server logic (Edit anything below) --------------- #
 
     # Import python functions to R
-    reticulate::source_python('pandemic_module.py')
+    reticulate::source_python('pandemic.py')
 
     observeEvent(input$dist, {
         if (input$dist != "negbin")
@@ -256,7 +258,7 @@ server <- function(input, output, session) {
             Info_Field = names(s),
             Current_System_Setting = as.character(s)
         )
-        datatable(
+        DT::datatable(
             data = df,
             rownames = FALSE,
             selection = 'none',
@@ -264,27 +266,6 @@ server <- function(input, output, session) {
             filter = 'none',
             options = list(dom = 't')
         )
-    })
-
-    # Display system path to python
-    output$which_python <- renderText({
-        paste0('which python: ', Sys.which('python'))
-    })
-
-    # Display Python version
-    output$python_version <- renderText({
-        rr <- reticulate::py_discover_config(use_environment = VIRTUALENV_NAME)
-        paste0('Python version: ', rr$version)
-    })
-
-    # Display RETICULATE_PYTHON
-    output$ret_env_var <- renderText({
-        paste0('RETICULATE_PYTHON: ', Sys.getenv('RETICULATE_PYTHON'))
-    })
-
-    # Display virtualenv root
-    output$venv_root <- renderText({
-        paste0('virtualenv root: ', reticulate::virtualenv_root())
     })
 }
 
