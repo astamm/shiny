@@ -9,10 +9,6 @@
 
 library(shiny)
 library(shinycssloaders)
-library(shinyjs)
-library(DT)
-library(plotly)
-library(jsonlite)
 
 source("setup_python_env.R")
 
@@ -25,9 +21,12 @@ jsResetCode <- "shinyjs.reset = function() {history.go(0)}"
 # Define UI for application that draws a histogram
 ui <- fluidPage(
     # Include shinyjs in the UI
-    useShinyjs(),
+    shinyjs::useShinyjs(),
     # Add the js code to the page
-    extendShinyjs(text = jsResetCode, functions = "reset"),
+    shinyjs::extendShinyjs(
+        text = jsResetCode,
+        functions = "reset"
+    ),
 
     titlePanel("A visualisation tool for TDA using GUDHI"),
 
@@ -115,9 +114,11 @@ server <- function(input, output, session) {
     })
 
     output$filtrationPlot <- plotly::renderPlotly({
+        fig <- compute_figure(data())
+        unlink("temp-plot.html")
         plotly::as_widget(
             jsonlite::fromJSON(
-                txt = compute_figure(data()),
+                txt = fig,
                 simplifyVector = FALSE
             )
         )
