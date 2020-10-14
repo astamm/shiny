@@ -9,8 +9,6 @@
 
 library(shiny)
 library(shinycssloaders)
-library(shinyjs)
-library(DT)
 library(ggplot2)
 
 source("setup_python_env.R")
@@ -24,9 +22,9 @@ jsResetCode <- "shinyjs.reset = function() {history.go(0)}"
 # Define UI for application that draws a histogram
 ui <- fluidPage(
     # Include shinyjs in the UI
-    useShinyjs(),
+    shinyjs::useShinyjs(),
     # Add the js code to the page
-    extendShinyjs(text = jsResetCode, functions = "reset"),
+    shinyjs::extendShinyjs(text = jsResetCode, functions = "reset"),
 
     titlePanel("Modèles de propagation d'épidémie"),
 
