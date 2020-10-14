@@ -1,7 +1,16 @@
+# all shiny apps
 shinycssloaders
 shinyjs
 DT
-ggplot2
+# python shiny apps
 reticulate
+# gudhi-viz
 plotly
 jsonlite
+# pandemic
+ggplot2
+# all rmd apps
+rmarkdown
+# teachr
+learnr
+testwhat
