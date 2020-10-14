@@ -37,8 +37,5 @@ def compute_figure(data):
             )
         )
     )
-    fig.data[0].i = triangles[:, 0]
-    fig.data[0].j = triangles[:, 1]
-    fig.data[0].k = triangles[:, 2]
     fig = json.dumps(fig, cls = plotly.utils.PlotlyJSONEncoder)
     return fig
