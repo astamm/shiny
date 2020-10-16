@@ -40,12 +40,20 @@ ui <- fluidPage(
                 label = "Data"
             ),
             sliderInput(
+                inputId = 'fps',
+                label = "Frames per second",
+                value = 25,
+                min = 0,
+                max = 50,
+                step = 1
+            ),
+            sliderInput(
                 inputId = 'alpha',
-                label = "Filtration value",
-                value = 0.005,
+                label = "Maximal simplex diameter",
+                value = 0.5,
                 min = 0.0,
-                max = 0.01,
-                step = 0.0001
+                max = 1.0,
+                step = 0.1
             )
 
         ),
@@ -56,9 +64,9 @@ ui <- fluidPage(
             tabsetPanel(
                 type = 'tabs',
                 tabPanel(
-                    'Interactive 3D view',
-                    withSpinner(plotly::plotlyOutput(
-                        outputId = 'filtrationPlot',
+                    'Simplicial Complexes',
+                    withSpinner(htmlOutput(
+                        outputId = 'complexPlot',
                         height = "800px"
                     ))
                 ),
@@ -109,19 +117,60 @@ server <- function(input, output, session) {
     # Import python functions to R
     reticulate::source_python('gudhi-viz.py')
 
-    data <- reactive({
-        compute_filtration(req(input$file$datapath), input$alpha)
+    # Import C++ functions to R
+    Rcpp::sourceCpp("gudhi-viz.cpp")
+
+    point_cloud <- reactive({
+        load_off_file(req(input$file$datapath))
     })
 
-    output$filtrationPlot <- plotly::renderPlotly({
-        fig <- compute_figure(data())
-        unlink("temp-plot.html")
-        plotly::as_widget(
-            jsonlite::fromJSON(
-                txt = fig,
-                simplifyVector = FALSE
-            )
+    distance_matrix <- reactive({
+        dist(point_cloud())
+    })
+
+    diameter_ub <- reactive({
+        dm <- distance_matrix()
+        n <- attr(dm, "Size")
+        round(
+            x = get_diameter_upper_bound(dm, n, 2),
+            digits = 3
         )
+    })
+
+    simplicial_complexes <- reactive({
+        build_complexes(
+            pts = point_cloud(),
+            max_diameter = diameter_ub(),
+            dimension = 2
+        )
+    })
+
+    diameter_lb <- reactive({
+        round(
+            x = get_diameter_lower_bound(
+                complexes = simplicial_complexes(),
+                dimension = 2
+            ),
+            digits = 3
+        )
+    })
+
+    observe({
+        lb <- diameter_lb()
+        ub <- diameter_ub()
+        updateSliderInput(
+            session = session,
+            inputId = "alpha",
+            value = (lb + ub) / 2,
+            min = lb,
+            max = ub,
+            step = round((ub - lb) / 99, digits = 3),
+        )
+    })
+
+    output$complexPlot <- renderUI({
+        sync_figures(simplicial_complexes(), input$alpha, input$fps)
+        includeHTML("temp-plot.html")
     })
 
     # Display info about the system running the code
