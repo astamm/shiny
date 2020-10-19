@@ -127,6 +127,9 @@ def sync_figures(complexes, alpha, fps = 0, file = "temp-plot.html"):
         vertical_spacing = 0.05, 
         horizontal_spacing = 0.05
     )
+    max_rips  = np.max(np.abs(complexes["rips"]["points"]))
+    max_alpha = np.max(np.abs(complexes["alpha"]["points"]))
+    fig_max = max([max_rips, max_alpha])
     fig1 = compute_figure(
         points = complexes["rips"]["points"],
         triangles = get_triangles(
@@ -149,10 +152,10 @@ def sync_figures(complexes, alpha, fps = 0, file = "temp-plot.html"):
     fig.add_trace(fig2, row = 1, col = 2)
     fig = go.Figure(fig)
     axis_layout = dict(
-        range = [-1.5, 1.5], 
         showbackground = False, 
         showticklabels = False, 
-        title_text = ""
+        title_text = "", 
+        range = [-fig_max, fig_max]
     )
     scene_layout = dict(
         xaxis = axis_layout,
