@@ -53,8 +53,7 @@ ui <- fluidPage(
                 value = 0.5,
                 min = 0.0,
                 max = 1.0,
-                step = 0.0001,
-                round = 3
+                step = 0.05
             )
 
         ),
@@ -115,7 +114,7 @@ server <- function(input, output, session) {
 
     # ------------------ App server logic (Edit anything below) --------------- #
 
-    # Import python functions to R
+    # Import Python functions to R
     reticulate::source_python('gudhi-viz.py')
 
     # Import C++ functions to R
