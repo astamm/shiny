@@ -9,7 +9,7 @@ from plotly.offline import plot
 def load_off_file(file):
     points = gd.read_points_from_off_file(off_file = file)
     points = np.array(points)
-    points = points / np.max(points)
+    points = points / np.max(np.abs(points))
     return points
 
 def get_diameter_lower_bound(complexes, dimension = 2):
