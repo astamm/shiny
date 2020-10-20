@@ -18,9 +18,9 @@ double get_diameter_upper_bound(const NumericVector &distanceMatrix,
         continue;
 
       if (i < j)
-        workVector[pos] = distanceMatrix[numberOfPoints * i - (i - 1) * i / 2 + j - i];
+        workVector[pos] = distanceMatrix[numberOfPoints * i - (i + 1) * i / 2 + j - i - 1];
       else
-        workVector[pos] = distanceMatrix[numberOfPoints * j - (j - 1) * j / 2 + i - j];
+        workVector[pos] = distanceMatrix[numberOfPoints * j - (j + 1) * j / 2 + i - j - 1];
 
       ++pos;
     }

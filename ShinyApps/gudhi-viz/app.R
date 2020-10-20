@@ -131,10 +131,8 @@ server <- function(input, output, session) {
     diameter_ub <- reactive({
         dm <- distance_matrix()
         n <- attr(dm, "Size")
-        round(
-            x = get_diameter_upper_bound(dm, n, 2),
-            digits = 3
-        )
+        bound <- get_diameter_upper_bound(dm, n, 10)
+        floor(1000 * bound) / 1000
     })
 
     simplicial_complexes <- reactive({
@@ -146,13 +144,11 @@ server <- function(input, output, session) {
     })
 
     diameter_lb <- reactive({
-        round(
-            x = get_diameter_lower_bound(
-                complexes = simplicial_complexes(),
-                dimension = 2
-            ),
-            digits = 3
+        bound <- get_diameter_lower_bound(
+            complexes = simplicial_complexes(),
+            dimension = 2
         )
+        ceiling(1000 * bound) / 1000
     })
 
     observe({
@@ -164,7 +160,7 @@ server <- function(input, output, session) {
             value = (lb + ub) / 2,
             min = lb,
             max = ub,
-            step = round((ub - lb) / 99, digits = 3),
+            step = round((ub - lb) / 99, 4)
         )
     })
 
