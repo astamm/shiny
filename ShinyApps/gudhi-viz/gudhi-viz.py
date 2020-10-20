@@ -46,6 +46,16 @@ def get_triangles(st, alpha):
     triangles = np.array([s[0] for s in st.get_skeleton(2) if len(s[0]) == 3 and s[1] <= alpha])
     return triangles
 
+def get_number_of_triangles(st, alpha):
+    triangles = np.array([s[0] for s in st.get_skeleton(2) if len(s[0]) == 3 and s[1] <= alpha])    
+    return triangles.shape[0]
+
+def get_number_of_simplices(st):
+    return st.num_simplices()
+
+def get_number_of_vertices(st):
+    return st.num_vertices()
+
 def compute_figure(points, triangles, complex_type, scene):
     mesh = go.Mesh3d(
         x = points[:, 0], 

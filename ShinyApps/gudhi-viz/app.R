@@ -9,6 +9,7 @@
 
 library(shiny)
 library(shinycssloaders)
+library(tibble)
 
 source("setup_python_env.R")
 
@@ -68,7 +69,8 @@ ui <- fluidPage(
                     withSpinner(htmlOutput(
                         outputId = 'complexPlot',
                         height = "800px"
-                    ))
+                    )),
+                    withSpinner(DT::dataTableOutput('simplexSummary')),
                 ),
                 tabPanel(
                     'Architecture Info',
@@ -167,6 +169,39 @@ server <- function(input, output, session) {
     output$complexPlot <- renderUI({
         sync_figures(simplicial_complexes(), input$alpha, input$fps)
         includeHTML("temp-plot.html")
+    })
+
+    output$simplexSummary <- DT::renderDataTable({
+        df <- tibble(
+            `Rips Complex` = c(
+                get_number_of_vertices(simplicial_complexes()$rips$simplex_tree),
+                get_number_of_simplices(simplicial_complexes()$rips$simplex_tree),
+                get_number_of_triangles(
+                    st = simplicial_complexes()$rips$simplex_tree,
+                    alpha = input$alpha
+                )
+            ),
+            `Alpha Complex` = c(
+                get_number_of_vertices(simplicial_complexes()$alpha$simplex_tree),
+                get_number_of_simplices(simplicial_complexes()$alpha$simplex_tree),
+                get_number_of_triangles(
+                    st = simplicial_complexes()$alpha$simplex_tree,
+                    alpha = input$alpha
+                )
+            )
+        )
+        DT::datatable(
+            data = df,
+            rownames = c(
+                "Number of vertices",
+                "Number of simplices",
+                "Number of triangles"
+            ),
+            selection = 'none',
+            style = 'bootstrap',
+            filter = 'none',
+            options = list(dom = 't')
+        )
     })
 
     # Display info about the system running the code

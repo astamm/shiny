@@ -9,6 +9,7 @@ reticulate
 # gudhi-viz
 plotly
 Rcpp
+tibble
 
 # pandemic
 ggplot2
