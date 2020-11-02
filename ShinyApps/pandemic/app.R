@@ -252,9 +252,9 @@ server <- function(input, output, session) {
     # Display info about the system running the code
     output$sysinfo <- DT::renderDataTable({
         s <- Sys.info()
-        df <- data.frame(
-            Info_Field = names(s),
-            Current_System_Setting = as.character(s)
+        df <- tibble(
+            `Info Field` = names(s),
+            `Current System Setting` = as.character(s)
         )
         DT::datatable(
             data = df,
