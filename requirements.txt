@@ -21,4 +21,5 @@ rmarkdown
 learnr
 datacamp/testwhat
 devtools
+skimr
 tidymodels
