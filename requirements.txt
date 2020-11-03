@@ -11,9 +11,6 @@ reticulate
 plotly
 Rcpp
 
-# pandemic
-ggplot2
-
 # all rmd apps
 rmarkdown
 kableExtra
@@ -24,4 +21,5 @@ datacamp/testwhat
 devtools
 skimr
 janitor
+tourr
 tidymodels
