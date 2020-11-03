@@ -16,10 +16,12 @@ ggplot2
 
 # all rmd apps
 rmarkdown
+kableExtra
 
 # teachr
 learnr
 datacamp/testwhat
 devtools
 skimr
+janitor
 tidymodels
