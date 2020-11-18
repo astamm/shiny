@@ -17,4 +17,11 @@ Rcpp
 rmarkdown
 
 # teachr
+rstudio-education/learnr
 astamm/teachr
+datacamp/testwhat
+tidyverse
+rlang
+lobstr
+microbenchmark
+janitor
