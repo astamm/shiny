@@ -17,7 +17,7 @@ Rcpp
 rmarkdown
 
 # teachr
-rstudio-education/learnr
+learnr
 astamm/teachr
 datacamp/testwhat
 tidyverse
